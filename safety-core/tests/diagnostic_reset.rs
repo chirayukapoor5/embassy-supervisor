@@ -18,7 +18,7 @@ fn changed_diagnostic_input_is_detected() {
 
 #[test]
 fn each_fault_reason_survives_record_roundtrip() {
-    for reason in [R::DeadlineMiss, R::TaskStalled, R::MonitorStale] {
+    for reason in [R::DeadlineMiss, R::TaskStalled, R::MonitorStale, R::DiagnosticFailure] {
         assert_eq!(decode_reset_reason(encode_reset_reason(reason)), Some(reason));
     }
 }
@@ -38,7 +38,7 @@ fn reset_records_refuse_corruption_unknown_or_erased_data() {
 fn previous_escalation_blocks_bench_autostart() {
     assert!(allow_bench_autostart(true, None));
     assert!(!allow_bench_autostart(false, None));
-    for reason in [R::DeadlineMiss, R::TaskStalled, R::MonitorStale] {
+    for reason in [R::DeadlineMiss, R::TaskStalled, R::MonitorStale, R::DiagnosticFailure] {
         assert!(!allow_bench_autostart(true, Some(reason)));
     }
 }

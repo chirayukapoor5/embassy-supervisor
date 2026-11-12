@@ -14,6 +14,7 @@ pub enum EscalationReason {
     DeadlineMiss,
     TaskStalled,
     MonitorStale,
+    DiagnosticFailure,
 }
 
 impl EscalationReason {
@@ -22,6 +23,7 @@ impl EscalationReason {
             Self::DeadlineMiss => 1,
             Self::TaskStalled => 2,
             Self::MonitorStale => 3,
+            Self::DiagnosticFailure => 4,
         }
     }
 
@@ -30,6 +32,7 @@ impl EscalationReason {
             1 => Some(Self::DeadlineMiss),
             2 => Some(Self::TaskStalled),
             3 => Some(Self::MonitorStale),
+            4 => Some(Self::DiagnosticFailure),
             _ => None,
         }
     }
@@ -39,6 +42,7 @@ impl EscalationReason {
             Self::DeadlineMiss => "deadline-miss",
             Self::TaskStalled => "task-stalled",
             Self::MonitorStale => "monitor-stale",
+            Self::DiagnosticFailure => "diagnostic-failure",
         }
     }
 }

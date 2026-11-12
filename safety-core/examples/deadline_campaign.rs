@@ -18,7 +18,9 @@ fn observe(
         running,
         last_completed_ms: completed_at,
         completed_windows: completed,
+        verified_windows: completed,
         missed_windows: missed,
+        failed_probes: 0,
     });
     let cap = enforced_workload_limit(100, report.fault);
     assert_eq!(report.fault, expected, "scenario {tag}");

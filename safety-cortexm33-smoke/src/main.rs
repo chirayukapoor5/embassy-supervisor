@@ -5,6 +5,8 @@
 #![no_main]
 use cortex_m_rt::entry;
 use safety_core::{Inputs, Mode, SafetyConfig, SafetyController};
+use safety_core::diagnostic::{diagnostic_probe_check, run_diagnostic_probe};
+use safety_core::reset_record::{encode_reset_reason, decode_reset_reason, allow_bench_autostart};
 use safety_core::deadline::{
     DeadlineConfig, DeadlineFault, DeadlineMonitor, DeadlineSnapshot,
     enforced_workload_limit,
@@ -19,6 +21,13 @@ fn main() -> ! {
 }
 
 fn verify_shared_policy() -> bool {
+    if !run_diagnostic_probe() || diagnostic_probe_check(0x1A2B_3C4C) { return false; }
+    let record = encode_reset_reason(EscalationReason::TaskStalled);
+    if decode_reset_reason(record) != Some(EscalationReason::TaskStalled)
+        || decode_reset_reason(record ^ 1).is_some()
+        || allow_bench_autostart(true, decode_reset_reason(record)) {
+        return false;
+    }
     let Ok(mut thermal) = SafetyController::new(SafetyConfig::default()) else {
         return false;
     };
@@ -35,11 +44,13 @@ fn verify_shared_policy() -> bool {
     let Ok(mut monitor) = DeadlineMonitor::new(DeadlineConfig::default()) else { return false; };
     monitor.observe(DeadlineSnapshot {
         now_ms: 100, running: true, last_completed_ms: 100,
-        completed_windows: 1, missed_windows: 0,
+        completed_windows: 1, verified_windows: 1, missed_windows: 0,
+        failed_probes: 0,
     });
     let report = monitor.observe(DeadlineSnapshot {
         now_ms: 200, running: true, last_completed_ms: 200,
-        completed_windows: 2, missed_windows: 1,
+        completed_windows: 2, verified_windows: 1, missed_windows: 1,
+        failed_probes: 0,
     });
     if report.fault != Some(DeadlineFault::MissedPeriod)
         || enforced_workload_limit(100, report.fault) != 0 {

@@ -88,7 +88,7 @@ fn invalid_grace_config_is_refused() {
 
 #[test]
 fn reason_encoding_roundtrips_and_rejects_unknown_values() {
-    for r in [R::DeadlineMiss, R::TaskStalled, R::MonitorStale] {
+    for r in [R::DeadlineMiss, R::TaskStalled, R::MonitorStale, R::DiagnosticFailure] {
         assert_eq!(R::from_code(r.code()), Some(r));
         assert!(!r.name().is_empty());
     }

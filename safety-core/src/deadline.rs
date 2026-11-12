@@ -11,6 +11,8 @@ pub enum DeadlineFault {
     MissedPeriod,
     /// No completed period arrived within the freshness timeout.
     TaskStalled,
+    /// The worker's bounded arithmetic diagnostic reported a mismatch.
+    DiagnosticFailure,
 }
 
 /// Observer inputs. All millisecond values are relative monotonic timestamps
@@ -21,7 +23,10 @@ pub struct DeadlineSnapshot {
     pub running: bool,
     pub last_completed_ms: u32,
     pub completed_windows: u32,
+    /// Completed on-time periods with successful bounded diagnostic work.
+    pub verified_windows: u32,
     pub missed_windows: u32,
+    pub failed_probes: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,13 +75,17 @@ pub struct DeadlineReport {
 /// A non-allocating monitor with a fault latch and evidence-based recovery.
 ///
 /// A missed period or stale task closes the gate immediately. Three DISTINCT
-/// fresh, successful completions reopen it. Monitoring an inactive workload
+/// fresh, bounded-diagnostic-verified completions reopen it. Merely
+/// waking every period cannot clear the fault when the safety gate is closed.
+/// Monitoring an inactive workload
 /// does not cause false trips; inactivity does NOT clear a previous fault.
 pub struct DeadlineMonitor {
     cfg: DeadlineConfig,
     fault: Option<DeadlineFault>,
     last_seen_completion: u32,
+    last_seen_verified: u32,
     last_seen_miss: u32,
+    last_seen_probe_failure: u32,
     good_after_fault: u8,
 }
 
@@ -87,7 +96,9 @@ impl DeadlineMonitor {
             cfg,
             fault: None,
             last_seen_completion: 0,
+            last_seen_verified: 0,
             last_seen_miss: 0,
+            last_seen_probe_failure: 0,
             good_after_fault: 0,
         })
     }
@@ -95,18 +106,24 @@ impl DeadlineMonitor {
     pub const fn fault(&self) -> Option<DeadlineFault> { self.fault }
 
     pub fn observe(&mut self, s: DeadlineSnapshot) -> DeadlineReport {
-        let fresh_completion = s.completed_windows != self.last_seen_completion;
-        let new_miss = s.missed_windows != self.last_seen_miss;
+        let fresh_completion = counter_advanced(s.completed_windows, self.last_seen_completion);
+        let fresh_verified = counter_advanced(s.verified_windows, self.last_seen_verified);
+        let new_miss = counter_advanced(s.missed_windows, self.last_seen_miss);
+        let new_probe_failure = counter_advanced(s.failed_probes, self.last_seen_probe_failure);
         self.last_seen_completion = s.completed_windows;
+        self.last_seen_verified = s.verified_windows;
         self.last_seen_miss = s.missed_windows;
+        self.last_seen_probe_failure = s.failed_probes;
         let age = elapsed_ms(s.now_ms, s.last_completed_ms);
 
         if s.running {
-            if new_miss {
+            if new_probe_failure {
+                self.trip(DeadlineFault::DiagnosticFailure);
+            } else if new_miss {
                 self.trip(DeadlineFault::MissedPeriod);
             } else if age > self.cfg.stale_after_ms {
                 self.trip(DeadlineFault::TaskStalled);
-            } else if self.fault.is_some() && fresh_completion {
+            } else if self.fault.is_some() && fresh_completion && fresh_verified {
                 self.good_after_fault = self.good_after_fault.saturating_add(1);
                 if self.good_after_fault >= self.cfg.recovery_completions {
                     self.fault = None;
@@ -130,6 +147,13 @@ impl DeadlineMonitor {
         self.fault = Some(fault);
         self.good_after_fault = 0;
     }
+}
+
+/// Wrapping monotonic progress: a one-step rollover advances; a counter reset
+/// or backward jump does not create fictitious fresh evidence.
+pub const fn counter_advanced(current: u32, previous: u32) -> bool {
+    let diff = current.wrapping_sub(previous);
+    diff != 0 && diff < 0x8000_0000
 }
 
 /// Wrap-safe age calculation for a contemporaneous timestamp pair.

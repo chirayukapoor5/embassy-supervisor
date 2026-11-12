@@ -34,7 +34,8 @@ fn ready() -> SafetyController {
 fn snap(now: u32, running: bool, count: u32, miss: u32, last: u32) -> DeadlineSnapshot {
     DeadlineSnapshot {
         now_ms: now, running, completed_windows: count,
-        missed_windows: miss, last_completed_ms: last,
+        verified_windows: count, missed_windows: miss, failed_probes: 0,
+        last_completed_ms: last,
     }
 }
 fn mode(m: Mode) -> &'static str {
