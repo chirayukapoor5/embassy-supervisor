@@ -1,36 +1,75 @@
-//! Opt-in, synthetic thermal scenario feeding the real RP2350 bench task.
+//! Simulated temperatures + second-core deadline supervision.
 //!
-//! NO physical sensor is read. This scenario is intentionally separate from
-//! any production thermal-safety implementation. It is for demonstration,
-//! cross-core integration and future verification work only.
+//! Uses a 50-ms best-effort monitor cadence and a 2-second scripted thermal
+//! sample cadence. NO physical sensor, safety certification or hard real-time
+//! guarantee is implied.
 
-use core::sync::atomic::{AtomicI32, AtomicU8, Ordering};
-use embassy_time::Timer;
+use core::sync::atomic::{AtomicI32, AtomicU8, AtomicU32, Ordering};
+use embassy_time::{Instant, Timer};
 use safety_core::{Fault, Inputs, Mode, SafetyConfig, SafetyController};
+use safety_core::deadline::{
+    DeadlineConfig, DeadlineFault, DeadlineMonitor, elapsed_ms, monitor_fresh,
+};
 
 const SENSOR_MISSING: i32 = i32::MIN;
+const MONITOR_POLL_MS: u64 = 50;
+const TEMP_SAMPLE_POLLS: u8 = 40; // 2 seconds
+const MONITOR_TIMEOUT_MS: u32 = 250;
 
-// Fail closed on startup: no benchmark work is allowed until the safety
-// controller has received enough valid simulated cool samples.
-static WORKLOAD_LIMIT: AtomicU8 = AtomicU8::new(0);
+// Fail closed until both the thermal policy and monitor have published.
+static THERMAL_LIMIT: AtomicU8 = AtomicU8::new(0);
 static LAST_TEMPERATURE: AtomicI32 = AtomicI32::new(SENSOR_MISSING);
+static DEADLINE_FAULT: AtomicU8 = AtomicU8::new(0);
+static RECOVERY_REMAINING: AtomicU8 = AtomicU8::new(0);
+static MONITOR_LAST_TICK_MS: AtomicU32 = AtomicU32::new(0);
 
-/// Cross-core publication from core 0 to core 1.
+fn fault_code(fault: Option<DeadlineFault>) -> u8 {
+    match fault {
+        None => 0,
+        Some(DeadlineFault::MissedPeriod) => 1,
+        Some(DeadlineFault::TaskStalled) => 2,
+    }
+}
+
+pub(crate) fn deadline_fault_name() -> &'static str {
+    match DEADLINE_FAULT.load(Ordering::Acquire) {
+        1 => "missed-period",
+        2 => "task-stalled",
+        _ => "none",
+    }
+}
+
+pub(crate) fn deadline_recovery_remaining() -> u8 {
+    RECOVERY_REMAINING.load(Ordering::Acquire)
+}
+
+pub(crate) fn monitor_is_fresh() -> bool {
+    let now = Instant::now().as_millis() as u32;
+    monitor_fresh(
+        now,
+        MONITOR_LAST_TICK_MS.load(Ordering::Acquire),
+        MONITOR_TIMEOUT_MS,
+    )
+}
+
+/// A stale safety monitoring task always closes the second core's workload
+/// gate, even if the latest synthetic temperature was previously normal.
 pub(crate) fn workload_limit() -> u8 {
-    WORKLOAD_LIMIT.load(Ordering::Acquire)
+    if !monitor_is_fresh() || DEADLINE_FAULT.load(Ordering::Acquire) != 0 {
+        0
+    } else {
+        THERMAL_LIMIT.load(Ordering::Acquire)
+    }
 }
 
 pub(crate) fn simulated_temperature() -> Option<i32> {
     let value = LAST_TEMPERATURE.load(Ordering::Acquire);
-    if value == SENSOR_MISSING {
-        None
-    } else {
-        Some(value)
-    }
+    if value == SENSOR_MISSING { None } else { Some(value) }
 }
 
 pub(crate) fn mode_name() -> &'static str {
-    match workload_limit() {
+    if workload_limit() == 0 { return "SAFE"; }
+    match THERMAL_LIMIT.load(Ordering::Acquire) {
         100 => "ACTIVE",
         10 => "IDLE",
         35 => "THROTTLED",
@@ -38,7 +77,7 @@ pub(crate) fn mode_name() -> &'static str {
     }
 }
 
-fn name(mode: Mode) -> &'static str {
+fn mode_name(mode: Mode) -> &'static str {
     match mode {
         Mode::Active => "ACTIVE",
         Mode::Idle => "IDLE",
@@ -47,7 +86,7 @@ fn name(mode: Mode) -> &'static str {
     }
 }
 
-fn fault_name(fault: Option<Fault>) -> &'static str {
+fn thermal_fault_name(fault: Option<Fault>) -> &'static str {
     match fault {
         None => "none",
         Some(Fault::NoValidSample) => "no-valid-sample",
@@ -57,55 +96,87 @@ fn fault_name(fault: Option<Fault>) -> &'static str {
     }
 }
 
-/// Scripted (temperature °C, workload requested) scenarios. Each point is
-/// published at a 2-second cadence; repeat the sequence indefinitely.
+fn deadline_name(fault: Option<DeadlineFault>) -> &'static str {
+    match fault {
+        None => "none",
+        Some(DeadlineFault::MissedPeriod) => "missed-period",
+        Some(DeadlineFault::TaskStalled) => "task-stalled",
+    }
+}
+
+/// Synthetic temperature data ONLY, never read from an RP2350 sensor.
 const SCENARIO: &[(Option<i16>, bool)] = &[
-    (Some(40), true),  // SAFE: recovery sample 1
-    (Some(40), true),  // SAFE: recovery sample 2
-    (Some(40), true),  // ACTIVE
-    (Some(72), true),  // THROTTLED
-    (Some(78), true),  // THROTTLED
-    (Some(85), true),  // SAFE: emergency
-    (Some(55), true),  // SAFE: recovery sample 1
-    (Some(55), true),  // SAFE: recovery sample 2
-    (Some(55), true),  // ACTIVE: recovery sample 3
-    (Some(40), false), // IDLE
-    (Some(40), true),  // ACTIVE
-    (None, true),      // SAFE: disconnected sensor
-    (Some(40), true),
-    (Some(40), true),
-    (Some(40), true),  // ACTIVE
+    (Some(40), true), (Some(40), true), (Some(40), true),
+    (Some(72), true), (Some(78), true), (Some(85), true),
+    (Some(55), true), (Some(55), true), (Some(55), true),
+    (Some(40), false), (Some(40), true), (None, true),
+    (Some(40), true), (Some(40), true), (Some(40), true),
 ];
 
 #[embassy_executor::task]
 pub(crate) async fn thermal_demo_task() {
     let mut controller = SafetyController::new(SafetyConfig::default())
-        .expect("validated synthetic safety policy");
-    let mut index = 0usize;
+        .expect("synthetic thermal config must validate");
+    let mut deadlines = DeadlineMonitor::new(DeadlineConfig::default())
+        .expect("deadline monitor config must validate");
+    let mut sample_index = 0usize;
+    let mut polls_until_sample = 0u8;
+    let mut previous_fault = None;
+
     loop {
-        let (temperature_c, workload_requested) = SCENARIO[index];
-        index = (index + 1) % SCENARIO.len();
+        if polls_until_sample == 0 {
+            let (temperature_c, workload_requested) = SCENARIO[sample_index];
+            sample_index = (sample_index + 1) % SCENARIO.len();
+            polls_until_sample = TEMP_SAMPLE_POLLS;
 
-        let decision = controller.update(Inputs {
-            temperature_c,
-            workload_requested,
-        });
-        LAST_TEMPERATURE.store(
-            temperature_c.map_or(SENSOR_MISSING, i32::from),
-            Ordering::Release,
-        );
-        WORKLOAD_LIMIT.store(decision.max_workload_percent, Ordering::Release);
+            let decision = controller.update(Inputs {
+                temperature_c, workload_requested,
+            });
+            LAST_TEMPERATURE.store(
+                temperature_c.map_or(SENSOR_MISSING, i32::from),
+                Ordering::Release,
+            );
+            THERMAL_LIMIT.store(decision.max_workload_percent, Ordering::Release);
+            defmt::info!(
+                "THERMAL-DEMO (synthetic): temperature={}C present={} state={} \
+                 budget={} percent fault={} recovery_remaining={}",
+                temperature_c.unwrap_or(0),
+                temperature_c.is_some(),
+                mode_name(decision.mode),
+                decision.max_workload_percent,
+                thermal_fault_name(decision.fault),
+                decision.recovery_samples_remaining,
+            );
+        }
 
-        defmt::info!(
-            "THERMAL-DEMO (synthetic): temperature={}C present={} state={} \
-             benchmark_budget={} percent fault={} recovery_remaining={}",
-            temperature_c.unwrap_or(0),
-            temperature_c.is_some(),
-            name(decision.mode),
-            decision.max_workload_percent,
-            fault_name(decision.fault),
-            decision.recovery_samples_remaining,
-        );
-        Timer::after_secs(2).await;
+        // Independently monitor the second core. A stale/missed completion
+        // immediately gates application work (before another temp sample).
+        let report = deadlines.observe(crate::bench::snapshot());
+        RECOVERY_REMAINING.store(report.recovery_completions_remaining, Ordering::Release);
+        DEADLINE_FAULT.store(fault_code(report.fault), Ordering::Release);
+        // Publish freshness last, after the latest decision is committed.
+        MONITOR_LAST_TICK_MS.store(Instant::now().as_millis() as u32, Ordering::Release);
+
+        if previous_fault != report.fault {
+            defmt::warn!(
+                "DEADLINE: fault={} age_ms={} recovery_remaining={} bench_running={}",
+                deadline_name(report.fault),
+                report.completion_age_ms,
+                report.recovery_completions_remaining,
+                crate::bench::BENCH_RUNNING.load(Ordering::Acquire),
+            );
+            previous_fault = report.fault;
+        }
+
+        polls_until_sample -= 1;
+        Timer::after_millis(MONITOR_POLL_MS).await;
     }
+}
+
+/// Status helper for the HTTP dashboard. The time field is best-effort and
+/// wrapping; reported independently from the worker progress counters.
+pub(crate) fn completion_age_ms() -> Option<u32> {
+    let s = crate::bench::snapshot();
+    if s.completed_windows == 0 { None }
+    else { Some(elapsed_ms(s.now_ms, s.last_completed_ms)) }
 }

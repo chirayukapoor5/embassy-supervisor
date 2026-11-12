@@ -70,3 +70,45 @@ integration points, not a remotely hosted simulator. The \`thermal-demo\`
 feature is a learning/demo path; replace its scripted values with a real
 sensor adapter, freshness watchdog and independent safety verification before
 using it with physical thermal control.
+
+
+## Deadline monitoring and fault-recovery verification (new)
+
+Under the opt-in \`thermal-demo\` firmware feature, BENCH on RP2350 core 1
+now publishes actual **100 ms work-period completion** timestamps, completed
+window count and missed deadline count. A period is marked missed if its
+completion exceeds the 100 ms target by more than **5 ms** (demo jitter margin).
+
+The independent core-0 safety task checks this data approximately every 50 ms:
+- Task running with no completion for more than 250 ms -> **task-stalled**.
+- A new missed-period counter value -> **missed-period**.
+- Either fault closes the workload gate, so the benchmark executes **zero**
+  application iterations while the fault is latched.
+- Only **three distinct new, on-time completions** with fresh heartbeats
+  can clear the latch; repeated polling, stopping the worker or temperature
+  changes alone cannot clear it.
+- If the safety monitor stops publishing for 250 ms, BENCH independently
+  fails closed and allows zero application iterations.
+
+No physical board or external temperature probe is required to run the tests.
+
+    cargo test --locked -p safety-core --target x86_64-pc-windows-msvc
+    cargo run --locked -p safety-core --example deadline_campaign --target x86_64-pc-windows-msvc
+    cargo build --locked --release -p firmware --features thermal-demo
+
+\`GET /api/safety\` (when running on an RP2350 board) also shows
+\`deadline_fault\`, \`missed_windows\`, \`completed_windows\`,
+\`monitor_fresh\`, \`deadline_recovery_remaining\` and
+\`completion_age_ms\`.
+
+On physical hardware, the pre-existing fault injection API can exercise a
+**best-effort** stall experiment after BENCH is started:
+
+    curl -X POST "http://10.42.0.61/api/fault?node=bench&kind=hog"
+    curl "http://10.42.0.61/api/safety"
+
+This is a **demonstration of detection and recovery policy**, not a proven
+worst-case execution-time bound, independently verified safety mechanism, or
+ISO 26262 compliance. The core-0 monitor shares the cooperative thread tier,
+so it cannot promise an immediate response when that tier is stalled. Safety
+watchdog escalation and physical-board timing validation remain separate work.

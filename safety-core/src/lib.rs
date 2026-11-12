@@ -7,6 +7,8 @@
 //! NOT validated RP2350 specifications or automotive safety limits.
 #![no_std]
 
+pub mod deadline;
+
 /// The four supported operating states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {

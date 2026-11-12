@@ -251,6 +251,22 @@ async fn serve_connection(
                     Some(t) => { let _ = write!(body, "{t}"); }
                     None => body.push_str("null"),
                 }
+                body.push_str(",\"deadline_fault\":\"");
+                body.push_str(crate::thermal_demo::deadline_fault_name());
+                body.push('"');
+                let _ = write!(
+                    body,
+                    ",\"deadline_recovery_remaining\":{},\"monitor_fresh\":{},\"bench_running\":{},\"completed_windows\":{},\"missed_windows\":{},\"completion_age_ms\":",
+                    crate::thermal_demo::deadline_recovery_remaining(),
+                    crate::thermal_demo::monitor_is_fresh(),
+                    crate::bench::BENCH_RUNNING.load(Ordering::Acquire),
+                    crate::bench::COMPLETED_WINDOWS.load(Ordering::Acquire),
+                    crate::bench::MISSED_WINDOWS.load(Ordering::Acquire),
+                );
+                match crate::thermal_demo::completion_age_ms() {
+                    Some(ms) => { let _ = write!(body, "{ms}"); }
+                    None => body.push_str("null"),
+                }
                 body.push('}');
                 send(socket, "application/json", &body, keep).await;
             }
