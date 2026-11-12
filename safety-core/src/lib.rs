@@ -9,6 +9,8 @@
 
 pub mod deadline;
 pub mod escalation;
+pub mod diagnostic;
+pub mod reset_record;
 
 /// The four supported operating states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
