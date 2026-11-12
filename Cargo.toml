@@ -19,7 +19,7 @@
 # the shared lock, firmware-only ones included; the `msrv` CI job checks the
 # committed lock on 1.88 instead.
 resolver = "2"
-members = ["supervisor", "supervisor-syntax", "supervisor-macros", "supervisor-tools", "supervisor-observe", "firmware", "bootloader", "safety-core"]
+members = ["supervisor", "supervisor-syntax", "supervisor-macros", "supervisor-tools", "supervisor-observe", "firmware", "bootloader", "safety-core", "safety-cortexm33-smoke"]
 # The host-testable crates, so `cargo test --target x86_64-unknown-linux-gnu`
 # at the root runs every suite; firmware and bootloader build with `-p`.
 default-members = ["supervisor", "supervisor-syntax", "supervisor-macros", "supervisor-tools", "supervisor-observe"]

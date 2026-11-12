@@ -1,0 +1,6 @@
+/* QEMU MPS2 AN505 only. NOT the RP2350 hardware map. */
+MEMORY
+{
+    FLASH : ORIGIN = 0x00000000, LENGTH = 4M
+    RAM : ORIGIN = 0x28000000, LENGTH = 2M
+}

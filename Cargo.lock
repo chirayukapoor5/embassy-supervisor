@@ -1740,6 +1740,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7c1c839d570d835527c9a5e4db7cb2198683a988cb9d7293fc8674e6bd58fc8"
 
 [[package]]
+name = "safety-cortexm33-smoke"
+version = "0.1.0"
+dependencies = [
+ "cortex-m-rt",
+ "safety-core",
+]
+
+[[package]]
 name = "safety-core"
 version = "0.1.0"
 
