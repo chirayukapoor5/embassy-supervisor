@@ -6,9 +6,9 @@ Automotive SPICE certification claim.
 
 ## Source-controlled traceability
 
-The [requirements.json](requirements.json) manifest contains 18 individual
-requirements (SR-001 through SR-018). Each one maps to an implementation
-source file and one fault-injection scenario (FI-001 through FI-018).
+The [requirements.json](requirements.json) manifest contains 27 individual
+requirements (SR-001 through SR-027). Each one maps to an implementation
+source file and one fault-injection scenario (FI-001 through FI-027).
 
 All scenarios execute the actual `safety-core` Rust state machines using
 **synthetic inputs and controlled timestamps**. They do not emulate the RP2350
@@ -49,12 +49,40 @@ USB networking, physical watchdog timeout, scratch-register retention,
 interrupt latency, thermal readings, power consumption, or actual execution
 deadlines.
 
-## Important known limitation
+## Diagnostic-backed recovery and reset evidence
 
-The deadline monitor currently counts timely benchmark periods to clear a
-fault, even if the safety gate permits zero application iterations during
-those periods. That is software evidence of task responsiveness but **not**
-proof that full computation recovered. Introduce a separate bounded
-diagnostic-work probe and independent heartbeat witness before asserting
-complete functional recovery. Full RP2350 runtime validation still needs
-compatible hardware or a sufficiently faithful multicore/peripheral emulator.
+The worker now executes a bounded 96-round arithmetic diagnostic every
+100 ms period, even when SAFE permits **zero application iterations**.
+It publishes a separate `verified_windows` counter only for on-time periods
+whose diagnostic returned the expected known-good value.
+
+The monitor requires three distinct increases of verified work to clear
+its fault latch. A failed probe raises `DiagnosticFailure`, which can
+escalate to a watchdog reset if it persists. A timer wake-up without
+verified diagnostic progress does not count as recovery.
+
+The reset-cause record stored in SCRATCH3 is versioned and contains an
+inverted reason byte to reject many accidental corruptions. A previous
+escalated reset blocks automatic BENCH startup, even if the boot flag is set.
+
+### Evidence boundaries
+
+| Scope | Verified by | Not established |
+|---|---|---|
+| Thermal and deadline policy | Rust host tests and fault cases | Real sensor or hard deadline timing |
+| Verified recovery | Bounded ALU diagnostic, counter and fault campaign | Independent hardware supervision |
+| Reset persistence format | Encoding, corruption and startup-inhibit tests | Physical retention across RP2350 reset |
+| Arm CPU portability | QEMU AN505 policy-runtime smoke | RP2350 multicore, USB or watchdog execution |
+| Firmware integration | Three Cortex-M33 release builds | Silicon behavior, timing or energy use |
+
+The diagnostic and benchmark run on the same worker CPU, so common-mode
+processor faults can defeat both. Reset records are best-effort and can
+be lost on a power cycle. Real hardware acceptance needs an RP2350 board.
+
+Run the dedicated recovery example using Windows PowerShell:
+
+```powershell
+cargo run --locked -p safety-core --example recovery_campaign --target x86_64-pc-windows-msvc
+```
+
+See [architecture](../architecture/README.md) for full integration details.

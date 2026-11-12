@@ -158,3 +158,29 @@ Firmware cross-build:
 **The watchdog path has been cross-compiled, not exercised on silicon.**
 The policy is an educational reliability demonstration, not a certified
 safety-monitor architecture.
+
+
+## Bounded diagnostic-work recovery and checked reset causes
+
+The core-1 BENCH task now executes an additional **96-round deterministic
+integer diagnostic** each period, including in SAFE where all application
+iterations are disabled. A \`verified_windows\` counter increments only
+when that computation passes and the period was on time. Three distinct,
+new verified completions are required to release a latched deadline fault.
+
+A diagnostic mismatch raises \`DiagnosticFailure\`, closes the application
+workload gate, and is eligible for the existing watchdog escalation policy.
+Counter rollback does not qualify as progress; normal u32 rollover does.
+
+RP2350 SCRATCH3 now uses a versioned and complement-checked reset reason
+format, read once at boot. Previous escalation inhibits BENCH auto-start even
+if the startup flag is unexpectedly still set.
+
+These are **software safety-policy checks**, not independent hardware
+diagnostics, power measurements, or certified functional-safety evidence.
+Physical watchdog resets and scratch retention remain untested.
+
+Run \`cargo run -p safety-core --example recovery_campaign --target
+x86_64-pc-windows-msvc\` to reproduce the diagnostic-gated recovery model.
+See [architecture](../docs/architecture/README.md) and
+[traceability](../docs/verification/README.md).
