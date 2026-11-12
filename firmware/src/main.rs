@@ -204,7 +204,7 @@ async fn main(spawner: Spawner) {
     // Simulation-only thermal decisions are published from the thread tier
     // and enforced by BENCH on core 1; the default firmware is unaffected.
     #[cfg(feature = "thermal-demo")]
-    spawner.spawn(thermal_demo::thermal_demo_task()).unwrap();
+    spawner.spawn(defmt::unwrap!(thermal_demo::thermal_demo_task()));
 
     USB_DEV.provide(p.USB);
     WD_DEV.provide(embassy_rp::watchdog::Watchdog::new(p.WATCHDOG));
