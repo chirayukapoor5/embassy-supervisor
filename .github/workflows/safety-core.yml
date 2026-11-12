@@ -74,6 +74,12 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qemu-system-arm
       - name: Build no_std policy for Cortex-M33
         run: cargo build --locked --release -p safety-cortexm33-smoke --target thumbv8m.main-none-eabihf
+      - name: Inspect QEMU vector-table mapping
+        run: |
+          readelf -h -l target/thumbv8m.main-none-eabihf/release/safety-cortexm33-smoke
+          printf 'xp /8wx 0x00000000\nxp /8wx 0x00400000\nxp /8wx 0x28000000\ninfo registers\nquit\n' | \
+            timeout 15s qemu-system-arm -M mps2-an505 -S -display none -serial none -monitor stdio -semihosting \
+              -kernel target/thumbv8m.main-none-eabihf/release/safety-cortexm33-smoke
       - name: Execute policy in Arm Cortex-M33 emulator
         run: |
           timeout 20s qemu-system-arm -M mps2-an505 -nographic -semihosting \
