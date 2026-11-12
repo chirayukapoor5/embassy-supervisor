@@ -1,8 +1,8 @@
-/* QEMU MPS2 AN505 only. NOT RP2350. Place stack in SSRAM-0,
-   which is accessible at address zero at secure boot. Keep code/RAM
-   disjoint within the 4 MiB SSRAM-0 window. */
+/* QEMU MPS2-AN505 ONLY, not RP2350.
+   AN505 starts its secure vector table at 0x10000000 (INIT_SVTOR).
+   The on-chip secure code window is at 0x10000000. */
 MEMORY
 {
-    FLASH : ORIGIN = 0x00000000, LENGTH = 128K
-    RAM : ORIGIN = 0x00020000, LENGTH = 128K
+    FLASH : ORIGIN = 0x10000000, LENGTH = 2M
+    RAM : ORIGIN = 0x28000000, LENGTH = 2M
 }
