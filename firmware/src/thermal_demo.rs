@@ -77,7 +77,7 @@ pub(crate) fn mode_name() -> &'static str {
     }
 }
 
-fn mode_name(mode: Mode) -> &'static str {
+fn thermal_mode_name(mode: Mode) -> &'static str {
     match mode {
         Mode::Active => "ACTIVE",
         Mode::Idle => "IDLE",
@@ -142,7 +142,7 @@ pub(crate) async fn thermal_demo_task() {
                  budget={} percent fault={} recovery_remaining={}",
                 temperature_c.unwrap_or(0),
                 temperature_c.is_some(),
-                mode_name(decision.mode),
+                thermal_mode_name(decision.mode),
                 decision.max_workload_percent,
                 thermal_fault_name(decision.fault),
                 decision.recovery_samples_remaining,
