@@ -11,7 +11,9 @@ use embassy_rp::interrupt::{InterruptExt, Priority};
 use {defmt_rtt as _, panic_probe as _};
 
 mod bench;
-#[cfg(any(feature = "breadcrumb", feature = "enabled-if"))]
+#[cfg(feature = "thermal-demo")]
+mod thermal_demo;
+#[cfg(any(feature = "breadcrumb", feature = "enabled-if", feature = "thermal-demo"))]
 mod bootflag;
 mod heap;
 mod heartbeat;
@@ -197,8 +199,21 @@ async fn main(spawner: Spawner) {
             None => defmt::info!("boot: no previous crumb ({=u32:#x})", prev),
         }
     }
+    #[cfg(feature = "thermal-demo")]
+    {
+        let reason = bootflag::take_safety_reset_reason();
+        watchdog::set_previous_reset(reason);
+        match reason {
+            Some(cause) => defmt::warn!("boot: previous safety reset reason={}", cause.name()),
+            None => defmt::info!("boot: no previous safety reset reason"),
+        }
+    }
     let p = embassy_rp::init(Default::default());
     heap::init();
+    // Simulation-only thermal decisions are published from the thread tier
+    // and enforced by BENCH on core 1; the default firmware is unaffected.
+    #[cfg(feature = "thermal-demo")]
+    spawner.spawn(defmt::unwrap!(thermal_demo::thermal_demo_task()));
 
     USB_DEV.provide(p.USB);
     WD_DEV.provide(embassy_rp::watchdog::Watchdog::new(p.WATCHDOG));

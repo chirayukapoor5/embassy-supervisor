@@ -298,3 +298,29 @@ changelogs.
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 [MIT license](LICENSE-MIT) at your option.
+
+
+## Fork safety/reliability extension
+
+This fork includes an original, additive **Cortex-M33 Power, Thermal &
+Reliability Supervisor** demo alongside the upstream embassy-supervisor
+runtime. The original framework, RP2350 application, A/B bootloader,
+watchdog and USB/network features remain attributed to their original
+author and retain the existing licenses.
+
+- [Safety-core Rust policy and tests](safety-core/README.md): simulated
+  thermal states, deadline monitoring, diagnostic-backed fault recovery,
+  and persistent watchdog escalation.
+- [Architecture and limitations](docs/architecture/README.md): core-to-core
+  workload gating, bounded diagnostic work, reset record and boot behavior.
+- [Requirements and fault-injection evidence](docs/verification/README.md):
+  27 mapped safety requirements and machine-readable CI reports.
+- [Arm Cortex-M33 QEMU smoke executable](safety-cortexm33-smoke/README.md):
+  runs the shared policy on QEMU AN505, not full RP2350 firmware.
+
+From the repository root, \`cargo build --release -p firmware --features
+thermal-demo\` cross-compiles the opt-in implementation.
+
+**All temperatures are synthetic. No physical RP2350 runtime, timing,
+watchdog reset, or energy measurement has been verified. No ISO 26262 or
+Automotive SPICE certification is claimed.**
