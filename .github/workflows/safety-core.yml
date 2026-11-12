@@ -1,0 +1,32 @@
+name: Safety Core CI
+
+on:
+  push:
+    branches: [feature/power-thermal-supervisor]
+    paths:
+      - "safety-core/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/safety-core.yml"
+  pull_request:
+    paths:
+      - "safety-core/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/safety-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  safety-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv8m.main-none-eabihf
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked -p safety-core --target x86_64-unknown-linux-gnu
+      - run: cargo check --locked -p safety-core --target thumbv8m.main-none-eabihf
+      - run: cargo run --locked -p safety-core --example simulate --target x86_64-unknown-linux-gnu
