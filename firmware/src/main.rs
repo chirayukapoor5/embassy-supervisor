@@ -11,6 +11,8 @@ use embassy_rp::interrupt::{InterruptExt, Priority};
 use {defmt_rtt as _, panic_probe as _};
 
 mod bench;
+#[cfg(feature = "thermal-demo")]
+mod thermal_demo;
 #[cfg(any(feature = "breadcrumb", feature = "enabled-if"))]
 mod bootflag;
 mod heap;
@@ -199,6 +201,10 @@ async fn main(spawner: Spawner) {
     }
     let p = embassy_rp::init(Default::default());
     heap::init();
+    // Simulation-only thermal decisions are published from the thread tier
+    // and enforced by BENCH on core 1; the default firmware is unaffected.
+    #[cfg(feature = "thermal-demo")]
+    spawner.spawn(thermal_demo::thermal_demo_task()).unwrap();
 
     USB_DEV.provide(p.USB);
     WD_DEV.provide(embassy_rp::watchdog::Watchdog::new(p.WATCHDOG));

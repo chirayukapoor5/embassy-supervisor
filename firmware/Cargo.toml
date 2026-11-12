@@ -6,6 +6,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+# Optional hardware-free safety integration; the default upstream demo is unchanged.
+safety-core = { path = "../safety-core", optional = true }
 # The generalized task supervisor. Its only default is `macros`; everything else
 # is named below (`control` arrives via `restart`). `trace-hooks` instruments the
 # executors and generates the hook symbols at the graph declaration; the
@@ -120,6 +122,9 @@ cortex-m = "0.7"
 cortex-m-rt = "0.7"
 
 [features]
+# Opt-in integration: deterministic SYNTHETIC temperatures drive the CPU benchmark
+# quota. This is not a physical sensor, validated thermal limit or safety cert.
+thermal-demo = ["dep:safety-core"]
 # The five opt-in features this demo exercises (four supervisor features plus
 # the demo-only `feed-gate`), each a separate flag so it can be turned off on
 # its own; all on by default so `cargo run -p firmware` demonstrates everything.

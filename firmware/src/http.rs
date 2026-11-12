@@ -236,6 +236,24 @@ async fn serve_connection(
                 build_events_json(&mut body);
                 send(socket, "application/json", &body, keep).await;
             }
+            #[cfg(feature = "thermal-demo")]
+            ("GET", "/api/safety") => {
+                let mut body = String::with_capacity(200);
+                let temp = crate::thermal_demo::simulated_temperature();
+                let _ = write!(
+                    body,
+                    "{{\"source\":\"synthetic\",\"mode\":\"{}\",\"benchmark_budget_percent\":{},\"executed_iterations\":{},\"temperature_c\":",
+                    crate::thermal_demo::mode_name(),
+                    crate::thermal_demo::workload_limit(),
+                    crate::bench::EXECUTED_ITERATIONS.load(Ordering::Relaxed),
+                );
+                match temp {
+                    Some(t) => { let _ = write!(body, "{t}"); }
+                    None => body.push_str("null"),
+                }
+                body.push('}');
+                send(socket, "application/json", &body, keep).await;
+            }
             ("GET", "/api/bench") => {
                 let mut body = String::with_capacity(48);
                 match crate::BENCH_EXIT.take() {

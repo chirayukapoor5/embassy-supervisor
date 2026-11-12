@@ -24,7 +24,7 @@ This is an **original, additive** \`no_std\` crate in the embassy-supervisor for
     cargo test -p safety-core --target x86_64-unknown-linux-gnu
     cargo run -p safety-core --example simulate --target x86_64-unknown-linux-gnu
 
-## Next integration
+## Further engineering work
 
 1. Provide fresh validated temperature samples using an RP2350 sensor-adapter task or a deterministic test provider.
 2. Add an Embassy task to periodically call SafetyController::update.
@@ -32,3 +32,41 @@ This is an **original, additive** \`no_std\` crate in the embassy-supervisor for
 4. Connect watchdog/liveness, verified deadline handling, event logging, and hazard-to-test traceability.
 
 The library's test suite validates state transitions and safety policy without hardware.
+
+
+## RP2350 firmware integration (opt-in)
+
+The policy **is now wired to the existing second-core BENCH task** under the
+\`thermal-demo\` firmware feature. It is not active in the default build.
+
+- \`firmware/src/thermal_demo.rs\` runs scripted, **synthetic** temperature
+  samples every 2 seconds on core 0, and publishes the safety decision through
+  a release/acquire \`AtomicU8\`.
+- \`firmware/src/bench.rs\` reads that limit from core 1 and executes at most
+  50,000 (ACTIVE), 5,000 (IDLE), 17,500 (THROTTLED), or 0 (SAFE)
+  xorshift iterations per 100 ms period.
+- SAFE suspends benchmark computation, but the task remains alive to respond
+  to supervisor shutdown requests. This is a cooperative budget, **not**
+  physical thermal/power management or a hard deadline guarantee.
+- \`GET /api/safety\` returns the synthetic temperature, mode, configured
+  benchmark budget and the wrapping cumulative executed iteration count.
+- The existing OTA, watchdog, network and supervisor task graph remain intact.
+  The benchmark still needs to be started using the existing control API or
+  the existing boot flag.
+
+Build from the repository root:
+
+    cargo build --release -p firmware --features thermal-demo
+    cargo test -p safety-core --target x86_64-pc-windows-msvc
+
+After flashing compatible RP2350 hardware and establishing USB networking,
+the current demo's API can start the benchmark and inspect the applied quota:
+
+    curl -X POST 'http://10.42.0.61/api/control?node=bench&op=start'
+    curl 'http://10.42.0.61/api/safety'
+
+**No hardware run has been performed.** The above endpoints are firmware
+integration points, not a remotely hosted simulator. The \`thermal-demo\`
+feature is a learning/demo path; replace its scripted values with a real
+sensor adapter, freshness watchdog and independent safety verification before
+using it with physical thermal control.

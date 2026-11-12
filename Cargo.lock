@@ -973,6 +973,7 @@ dependencies = [
  "panic-probe",
  "reqwless",
  "ruzstd",
+ "safety-core",
 ]
 
 [[package]]

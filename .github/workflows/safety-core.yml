@@ -5,6 +5,7 @@ on:
     branches: [feature/power-thermal-supervisor]
     paths:
       - "safety-core/**"
+      - "firmware/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/safety-core.yml"
@@ -30,3 +31,5 @@ jobs:
       - run: cargo test --locked -p safety-core --target x86_64-unknown-linux-gnu
       - run: cargo check --locked -p safety-core --target thumbv8m.main-none-eabihf
       - run: cargo run --locked -p safety-core --example simulate --target x86_64-unknown-linux-gnu
+      - run: cargo build --locked --release -p firmware --features thermal-demo
+      - run: cargo build --locked --release -p firmware

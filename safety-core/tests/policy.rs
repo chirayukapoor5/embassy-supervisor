@@ -138,3 +138,35 @@ fn state_changed_reports_actual_transition_only() {
     assert!(c.update(sample(Some(72), true)).state_changed);
     assert!(!c.update(sample(Some(73), true)).state_changed);
 }
+
+#[test]
+fn budgeted_iterations_scales_real_benchmark_quota() {
+    use safety_core::budgeted_iterations as budget;
+    assert_eq!(budget(50_000, 100), 50_000);
+    assert_eq!(budget(50_000, 35), 17_500);
+    assert_eq!(budget(50_000, 10), 5_000);
+    assert_eq!(budget(50_000, 0), 0);
+    assert_eq!(budget(50_000, 250), 50_000);
+}
+
+#[test]
+fn budgeted_iterations_is_overflow_safe() {
+    use safety_core::budgeted_iterations as budget;
+    assert_eq!(budget(u32::MAX, 100), u32::MAX);
+    assert_eq!(budget(u32::MAX, 0), 0);
+    assert_eq!(budget(99, 35), 34);
+}
+
+#[test]
+fn each_safety_state_restricts_benchmark_iterations() {
+    use safety_core::budgeted_iterations as budget;
+    let mut controller = ready();
+    for (temp, expected) in [(40, 50_000), (72, 17_500), (85, 0)] {
+        let decision = controller.update(sample(Some(temp), true));
+        assert_eq!(budget(50_000, decision.max_workload_percent), expected);
+    }
+    for _ in 0..3 {
+        controller.update(sample(Some(40), true));
+    }
+    assert_eq!(budget(50_000, controller.update(sample(Some(40), false)).max_workload_percent), 5_000);
+}

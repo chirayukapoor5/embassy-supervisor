@@ -213,3 +213,13 @@ pub const fn workload_limit(mode: Mode) -> u8 {
         Mode::Safe => 0,
     }
 }
+
+/// Calculate the maximum whole-loop iteration count for a configured per-window
+/// budget and percentage, saturating any caller-supplied percentage to 100.
+///
+/// This is an instruction-count quota, NOT measured CPU utilization, power,
+/// voltage, or frequency. u64 intermediates prevent multiplication overflow.
+pub const fn budgeted_iterations(max_iterations: u32, percent: u8) -> u32 {
+    let p = if percent > 100 { 100 } else { percent };
+    ((max_iterations as u64 * p as u64) / 100) as u32
+}
