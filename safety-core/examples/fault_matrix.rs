@@ -1,6 +1,8 @@
 //! Deterministic fault-injection campaign; all cases use actual safety-core.
 use safety_core::{Inputs, Mode, SafetyConfig, SafetyController, budgeted_iterations};
-use safety_core::deadline::{DeadlineConfig, DeadlineFault, DeadlineMonitor, DeadlineSnapshot, enforced_workload_limit, monitor_fresh};
+use safety_core::diagnostic::{run_diagnostic_probe,diagnostic_probe_check};
+use safety_core::reset_record::{encode_reset_reason,decode_reset_reason,allow_bench_autostart};
+use safety_core::deadline::{DeadlineConfig, DeadlineFault, DeadlineMonitor, DeadlineSnapshot, enforced_workload_limit, monitor_fresh,counter_advanced};
 use safety_core::escalation::{EscalationConfig, EscalationPolicy, EscalationReason as R, EscalationStage as S};
 
 struct Results { total: usize, failures: usize }
@@ -118,5 +120,55 @@ fn main() {
     p.observe(start,Some(R::MonitorStale));
     let d=p.observe(start.wrapping_add(5_000),Some(R::MonitorStale));
     r.case("FI-018","SR-018","timer_counter_rollover","RESET_PENDING",stage(d.stage));
+
+    r.case("FI-019","SR-019","bounded_diagnostic_known_vector","PASS",
+           if run_diagnostic_probe(){"PASS"}else{"INCORRECT"});
+    r.case("FI-020","SR-020","corrupt_diagnostic_seed","REJECT",
+           if !diagnostic_probe_check(0x1A2B_3C4C){"REJECT"}else{"INCORRECT"});
+    let mut m=deadline();
+    m.observe(snap(100,true,1,0,100));
+    let mut failed=snap(200,true,2,0,200);
+    failed.verified_windows=1;
+    failed.failed_probes=1;
+    let fault=m.observe(failed);
+    r.case("FI-021","SR-021","failed_probe_increment","DiagnosticFailure",
+           if fault.fault==Some(DeadlineFault::DiagnosticFailure){"DiagnosticFailure"}else{"INCORRECT"});
+    let mut m=deadline();
+    let mut start=snap(100,true,1,1,100);
+    start.verified_windows=0;
+    m.observe(start);
+    let mut last=m.observe(start);
+    for n in 2..6 {
+        let mut period=snap(n*100,true,n,1,n*100);
+        period.verified_windows=0;
+        last=m.observe(period);
+    }
+    r.case("FI-022","SR-022","timer_wakeups_no_verified_work","LATCHED",
+           if last.fault==Some(DeadlineFault::MissedPeriod)
+               && last.recovery_completions_remaining==3 {"LATCHED"}else{"INCORRECT"});
+    let mut m=deadline();
+    let mut start=snap(100,true,1,1,100);
+    start.verified_windows=0;
+    m.observe(start);
+    let mut verified=m.observe(start);
+    for n in 2..5 {
+        let mut period=snap(n*100,true,n,1,n*100);
+        period.verified_windows=n-1;
+        verified=m.observe(period);
+    }
+    r.case("FI-023","SR-023","three_verified_diagnostic_periods","CLEARED",
+           if verified.fault.is_none(){"CLEARED"}else{"INCORRECT"});
+    let word=encode_reset_reason(R::DiagnosticFailure);
+    r.case("FI-024","SR-024","scratch_reason_single_bitflip","VALID_AND_REJECT_CORRUPT",
+           if decode_reset_reason(word)==Some(R::DiagnosticFailure)
+             && decode_reset_reason(word^1).is_none(){"VALID_AND_REJECT_CORRUPT"}else{"INCORRECT"});
+    r.case("FI-025","SR-025","prior_reset_inhibits_bench_autostart","BLOCKED",
+           if !allow_bench_autostart(true,decode_reset_reason(word)){"BLOCKED"}else{"INCORRECT"});
+    r.case("FI-026","SR-026","u32_counter_wrap_and_backward","WRAP_ONLY",
+           if counter_advanced(0,u32::MAX)&&!counter_advanced(0,1){"WRAP_ONLY"}else{"INCORRECT"});
+    let mut p=escalation();
+    p.observe(1000,Some(R::DiagnosticFailure));
+    let e=p.observe(6000,Some(R::DiagnosticFailure));
+    r.case("FI-027","SR-027","persistent_diagnostic_failure","RESET_PENDING",stage(e.stage));
     r.finish();
 }

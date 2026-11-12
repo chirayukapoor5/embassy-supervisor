@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "scope": "synthetic safety-core policy validation; not RP2350 hardware qualification",
+  "scope": "synthetic safety-core policy with verified diagnostic recovery and reset evidence; hardware not exercised",
   "requirements": [
     {
       "id": "SR-001",
@@ -109,6 +109,60 @@
       "description": "Handle monotonic timestamp rollover in escalation",
       "implementation": "safety-core/src/escalation.rs",
       "scenario": "FI-018"
+    },
+    {
+      "id": "SR-019",
+      "description": "Worker bounded diagnostic matches golden vector",
+      "implementation": "safety-core/src/diagnostic.rs",
+      "scenario": "FI-019"
+    },
+    {
+      "id": "SR-020",
+      "description": "Corrupted diagnostic input is detected",
+      "implementation": "safety-core/src/diagnostic.rs",
+      "scenario": "FI-020"
+    },
+    {
+      "id": "SR-021",
+      "description": "A failed probe creates a latched diagnostic failure",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-021"
+    },
+    {
+      "id": "SR-022",
+      "description": "Timer-only completions cannot clear a deadline latch",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-022"
+    },
+    {
+      "id": "SR-023",
+      "description": "Three verified diagnostic periods can recover during SAFE",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-023"
+    },
+    {
+      "id": "SR-024",
+      "description": "Reset record encoding detects accidental corruption",
+      "implementation": "safety-core/src/reset_record.rs",
+      "scenario": "FI-024"
+    },
+    {
+      "id": "SR-025",
+      "description": "A prior safety reset inhibits benchmark auto-start",
+      "implementation": "safety-core/src/reset_record.rs",
+      "scenario": "FI-025"
+    },
+    {
+      "id": "SR-026",
+      "description": "Counter rollover is valid progress but counter rollback is not",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-026"
+    },
+    {
+      "id": "SR-027",
+      "description": "Persistent diagnostic failures escalate to watchdog reset-pending",
+      "implementation": "safety-core/src/escalation.rs",
+      "scenario": "FI-027"
     }
   ]
 }
