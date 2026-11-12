@@ -251,6 +251,14 @@ async fn serve_connection(
                     Some(t) => { let _ = write!(body, "{t}"); }
                     None => body.push_str("null"),
                 }
+                let _ = write!(
+                    body,
+                    ",\"watchdog_escalation_stage\":\"{}\",\"watchdog_escalation_reason\":\"{}\",\"watchdog_escalation_age_ms\":{},\"previous_safety_reset\":\"{}\"",
+                    crate::watchdog::escalation_stage_name(),
+                    crate::watchdog::escalation_reason_name(),
+                    crate::watchdog::escalation_age_ms(),
+                    crate::watchdog::previous_reset_reason(),
+                );
                 body.push_str(",\"deadline_fault\":\"");
                 body.push_str(crate::thermal_demo::deadline_fault_name());
                 body.push('"');

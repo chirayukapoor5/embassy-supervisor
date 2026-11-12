@@ -8,6 +8,7 @@
 #![no_std]
 
 pub mod deadline;
+pub mod escalation;
 
 /// The four supported operating states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

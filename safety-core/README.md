@@ -112,3 +112,49 @@ worst-case execution-time bound, independently verified safety mechanism, or
 ISO 26262 compliance. The core-0 monitor shares the cooperative thread tier,
 so it cannot promise an immediate response when that tier is stalled. Safety
 watchdog escalation and physical-board timing validation remain separate work.
+
+
+## Persistent-fault watchdog escalation (opt-in firmware)
+
+The existing RP2350 8-second hardware watchdog now integrates a separate
+\`no_std\` escalation policy (no second watchdog is instantiated):
+
+1. BENCH deadline misses or task stalls are identified by the existing
+   deadline monitor; an unresponsive safety monitor is a third cause.
+2. The watchdog feeder samples these causes every approximately 2 seconds.
+   A continuing, *same-reason* fault receives a configurable **5-second
+   grace window**; transient faults clear the timer.
+3. On escalation, the watchdog feeder latches RESET-PENDING, records the
+   reason in \`WATCHDOG.SCRATCH3\`, disables the persistent BENCH autostart
+   flag in \`SCRATCH5\` (if \`enabled-if\` is enabled), and **stops feeding**
+   the watchdog. The existing hardware watchdog expires within about
+   8 seconds of its last feed, assuming normal operation.
+4. On next boot the diagnostic is read once, logged, exposed through
+   \`GET /api/safety\` as \`previous_safety_reset\`, and cleared.
+5. A transient thermal SAFE in the synthetic scenario **does not** trigger a
+   reset. Stopping BENCH through normal control also does not by itself
+   trigger escalation.
+
+The grace time is evaluated only at feed opportunities, so it is **not** a
+5-second hard deadline. Hardware reset and scratch-register persistence are
+not physically tested. A stall of the thread executor itself may prevent the
+diagnostic from being written even though the hardware watchdog eventually
+resets the chip. The watchdog does not prevent a crash before the feed loop.
+The benchmark autostart flag is cleared to avoid a demo reset loop.
+
+\`GET /api/safety\` now includes \`watchdog_escalation_stage\`,
+\`watchdog_escalation_reason\`, \`watchdog_escalation_age_ms\` and
+\`previous_safety_reset\`, in addition to thermal and deadline information.
+
+Verify with host-only tests:
+
+    cargo test --locked -p safety-core --target x86_64-pc-windows-msvc
+    cargo run --locked -p safety-core --example escalation_campaign --target x86_64-pc-windows-msvc
+
+Firmware cross-build:
+
+    cargo build --locked --release -p firmware --features thermal-demo
+
+**The watchdog path has been cross-compiled, not exercised on silicon.**
+The policy is an educational reliability demonstration, not a certified
+safety-monitor architecture.

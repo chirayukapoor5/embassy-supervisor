@@ -44,3 +44,30 @@ pub fn take_prev_crumb() -> u32 {
     WATCHDOG.scratch6().write(|v| *v = 0);
     w
 }
+
+
+// SAFETY-DEMO: SCRATCH3 is reserved solely for a best-effort reset cause.
+// SCRATCH5 remains the BENCH boot flag; SCRATCH6 remains the supervisor crumb.
+// No use is made of SCRATCH4, whose boot-ROM vector magic must stay untouched.
+#[cfg(feature = "thermal-demo")]
+const SAFETY_RESET_MAGIC: u32 = 0x5AFE_C000;
+
+/// Record the reason before withholding the existing hardware watchdog feed.
+/// The RP2350 retains these scratch registers over a watchdog/soft reset, not
+/// over power loss. ROM/probe interactions can overwrite them; treat as hints.
+#[cfg(feature = "thermal-demo")]
+pub fn stash_safety_reset_reason(reason: safety_core::escalation::EscalationReason) {
+    WATCHDOG.scratch3().write(|w| *w = SAFETY_RESET_MAGIC | u32::from(reason.code()));
+}
+
+/// Read once at boot, then clear to avoid displaying stale reset diagnostics.
+#[cfg(feature = "thermal-demo")]
+pub fn take_safety_reset_reason() -> Option<safety_core::escalation::EscalationReason> {
+    let word = WATCHDOG.scratch3().read();
+    WATCHDOG.scratch3().write(|w| *w = 0);
+    if word & !0xff == SAFETY_RESET_MAGIC {
+        safety_core::escalation::EscalationReason::from_code(word as u8)
+    } else {
+        None
+    }
+}

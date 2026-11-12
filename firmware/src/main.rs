@@ -13,7 +13,7 @@ use {defmt_rtt as _, panic_probe as _};
 mod bench;
 #[cfg(feature = "thermal-demo")]
 mod thermal_demo;
-#[cfg(any(feature = "breadcrumb", feature = "enabled-if"))]
+#[cfg(any(feature = "breadcrumb", feature = "enabled-if", feature = "thermal-demo"))]
 mod bootflag;
 mod heap;
 mod heartbeat;
@@ -197,6 +197,15 @@ async fn main(spawner: Spawner) {
         match decode_crumb(prev) {
             Some((node, phase)) => defmt::info!("boot: previous crumb: {} {}", node, phase),
             None => defmt::info!("boot: no previous crumb ({=u32:#x})", prev),
+        }
+    }
+    #[cfg(feature = "thermal-demo")]
+    {
+        let reason = bootflag::take_safety_reset_reason();
+        watchdog::set_previous_reset(reason);
+        match reason {
+            Some(cause) => defmt::warn!("boot: previous safety reset reason={}", cause.name()),
+            None => defmt::info!("boot: no previous safety reset reason"),
         }
     }
     let p = embassy_rp::init(Default::default());

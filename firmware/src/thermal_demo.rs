@@ -54,6 +54,25 @@ pub(crate) fn monitor_is_fresh() -> bool {
 
 /// A stale safety monitoring task always closes the second core's workload
 /// gate, even if the latest synthetic temperature was previously normal.
+/// Select only *persistent runtime monitoring failures* for escalation.
+/// Transient scripted high temperatures are not watchdog reset requests.
+/// A previously stopped BENCH does not cause a reset loop merely because a
+/// historical deadline fault remains latched until a future restart.
+pub(crate) fn escalation_cause() -> Option<safety_core::escalation::EscalationReason> {
+    use safety_core::escalation::EscalationReason;
+    if !monitor_is_fresh() {
+        return Some(EscalationReason::MonitorStale);
+    }
+    if !crate::bench::BENCH_RUNNING.load(Ordering::Acquire) {
+        return None;
+    }
+    match DEADLINE_FAULT.load(Ordering::Acquire) {
+        1 => Some(EscalationReason::DeadlineMiss),
+        2 => Some(EscalationReason::TaskStalled),
+        _ => None,
+    }
+}
+
 pub(crate) fn workload_limit() -> u8 {
     if !monitor_is_fresh() || DEADLINE_FAULT.load(Ordering::Acquire) != 0 {
         0
