@@ -19,7 +19,16 @@ const BENCH_ON: u32 = 0xBE9C_0001;
 /// `bench`'s `enabled_if:` predicate: is the boot flag set?
 #[cfg(feature = "enabled-if")]
 pub fn bench_enabled() -> bool {
-    WATCHDOG.scratch5().read() == BENCH_ON
+    let enabled = WATCHDOG.scratch5().read() == BENCH_ON;
+    #[cfg(feature = "thermal-demo")]
+    {
+        safety_core::reset_record::allow_bench_autostart(
+            enabled,
+            crate::watchdog::previous_reset_cause(),
+        )
+    }
+    #[cfg(not(feature = "thermal-demo"))]
+    { enabled }
 }
 
 /// Set or clear the boot flag; takes effect at the next boot.
@@ -49,15 +58,12 @@ pub fn take_prev_crumb() -> u32 {
 // SAFETY-DEMO: SCRATCH3 is reserved solely for a best-effort reset cause.
 // SCRATCH5 remains the BENCH boot flag; SCRATCH6 remains the supervisor crumb.
 // No use is made of SCRATCH4, whose boot-ROM vector magic must stay untouched.
-#[cfg(feature = "thermal-demo")]
-const SAFETY_RESET_MAGIC: u32 = 0x5AFE_C000;
-
 /// Record the reason before withholding the existing hardware watchdog feed.
 /// The RP2350 retains these scratch registers over a watchdog/soft reset, not
 /// over power loss. ROM/probe interactions can overwrite them; treat as hints.
 #[cfg(feature = "thermal-demo")]
 pub fn stash_safety_reset_reason(reason: safety_core::escalation::EscalationReason) {
-    WATCHDOG.scratch3().write(|w| *w = SAFETY_RESET_MAGIC | u32::from(reason.code()));
+    WATCHDOG.scratch3().write(|w| *w = safety_core::reset_record::encode_reset_reason(reason));
 }
 
 /// Read once at boot, then clear to avoid displaying stale reset diagnostics.
@@ -65,9 +71,5 @@ pub fn stash_safety_reset_reason(reason: safety_core::escalation::EscalationReas
 pub fn take_safety_reset_reason() -> Option<safety_core::escalation::EscalationReason> {
     let word = WATCHDOG.scratch3().read();
     WATCHDOG.scratch3().write(|w| *w = 0);
-    if word & !0xff == SAFETY_RESET_MAGIC {
-        safety_core::escalation::EscalationReason::from_code(word as u8)
-    } else {
-        None
-    }
+    safety_core::reset_record::decode_reset_reason(word)
 }

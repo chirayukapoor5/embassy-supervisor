@@ -20,6 +20,10 @@ pub(crate) static LAST_COMPLETED_MS: AtomicU32 = AtomicU32::new(0);
 pub(crate) static COMPLETED_WINDOWS: AtomicU32 = AtomicU32::new(0);
 #[cfg(feature = "thermal-demo")]
 pub(crate) static MISSED_WINDOWS: AtomicU32 = AtomicU32::new(0);
+#[cfg(feature = "thermal-demo")]
+pub(crate) static VERIFIED_WINDOWS: AtomicU32 = AtomicU32::new(0);
+#[cfg(feature = "thermal-demo")]
+pub(crate) static FAILED_PROBES: AtomicU32 = AtomicU32::new(0);
 
 #[cfg(feature = "thermal-demo")]
 pub(crate) fn snapshot() -> safety_core::deadline::DeadlineSnapshot {
@@ -30,7 +34,9 @@ pub(crate) fn snapshot() -> safety_core::deadline::DeadlineSnapshot {
         running: BENCH_RUNNING.load(Ordering::Acquire),
         last_completed_ms: LAST_COMPLETED_MS.load(Ordering::Acquire),
         completed_windows: COMPLETED_WINDOWS.load(Ordering::Acquire),
+        verified_windows: VERIFIED_WINDOWS.load(Ordering::Acquire),
         missed_windows: MISSED_WINDOWS.load(Ordering::Acquire),
+        failed_probes: FAILED_PROBES.load(Ordering::Acquire),
         now_ms: Instant::now().as_millis() as u32,
     }
 }
@@ -77,6 +83,12 @@ pub(crate) async fn bench_task(node: &'static TaskNode) -> u32 {
             slices = slices.wrapping_add(1);
         }
 
+        // SAFE permits zero application iterations, but continues a bounded
+        // diagnostic arithmetic check so recovery is supported by actual
+        // core-1 computation, not merely timer wakeups.
+        #[cfg(feature = "thermal-demo")]
+        let probe_ok = safety_core::diagnostic::run_diagnostic_probe();
+
         #[cfg(feature = "thermal-demo")]
         {
             use embassy_futures::select::{Either, select};
@@ -95,15 +107,21 @@ pub(crate) async fn bench_task(node: &'static TaskNode) -> u32 {
 
             let completed_at = Instant::now();
             // Measure actual period completion, including timing jitter.
-            if completed_at > due {
-                // Timer scheduling is approximate: tolerate 5 ms before
-                // recording a miss rather than counting sub-ms wake jitter.
-                if completed_at - due > Duration::from_millis(5) {
-                    MISSED_WINDOWS.fetch_add(1, Ordering::AcqRel);
-                }
+            // Count only periods that finished within the 5-ms jitter margin.
+            let missed = completed_at > due && completed_at - due > Duration::from_millis(5);
+            if missed {
+                MISSED_WINDOWS.fetch_add(1, Ordering::AcqRel);
+            }
+            if !probe_ok {
+                FAILED_PROBES.fetch_add(1, Ordering::AcqRel);
             }
             LAST_COMPLETED_MS.store(completed_at.as_millis() as u32, Ordering::Release);
             COMPLETED_WINDOWS.fetch_add(1, Ordering::AcqRel);
+            // A verified period means separate diagnostic computation ran and
+            // passed on core 1 *and* the period was on time. Publish last.
+            if probe_ok && !missed {
+                VERIFIED_WINDOWS.fetch_add(1, Ordering::Release);
+            }
         }
         #[cfg(not(feature = "thermal-demo"))]
         embassy_futures::yield_now().await;

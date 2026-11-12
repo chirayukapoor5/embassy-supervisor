@@ -264,12 +264,14 @@ async fn serve_connection(
                 body.push('"');
                 let _ = write!(
                     body,
-                    ",\"deadline_recovery_remaining\":{},\"monitor_fresh\":{},\"bench_running\":{},\"completed_windows\":{},\"missed_windows\":{},\"completion_age_ms\":",
+                    ",\"deadline_recovery_remaining\":{},\"monitor_fresh\":{},\"bench_running\":{},\"completed_windows\":{},\"missed_windows\":{},\"verified_windows\":{},\"failed_probes\":{},\"completion_age_ms\":",
                     crate::thermal_demo::deadline_recovery_remaining(),
                     crate::thermal_demo::monitor_is_fresh(),
                     crate::bench::BENCH_RUNNING.load(Ordering::Acquire),
                     crate::bench::COMPLETED_WINDOWS.load(Ordering::Acquire),
                     crate::bench::MISSED_WINDOWS.load(Ordering::Acquire),
+                    crate::bench::VERIFIED_WINDOWS.load(Ordering::Acquire),
+                    crate::bench::FAILED_PROBES.load(Ordering::Acquire),
                 );
                 match crate::thermal_demo::completion_age_ms() {
                     Some(ms) => { let _ = write!(body, "{ms}"); }

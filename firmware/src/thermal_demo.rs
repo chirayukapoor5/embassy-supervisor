@@ -28,6 +28,7 @@ fn fault_code(fault: Option<DeadlineFault>) -> u8 {
         None => 0,
         Some(DeadlineFault::MissedPeriod) => 1,
         Some(DeadlineFault::TaskStalled) => 2,
+        Some(DeadlineFault::DiagnosticFailure) => 3,
     }
 }
 
@@ -35,6 +36,7 @@ pub(crate) fn deadline_fault_name() -> &'static str {
     match DEADLINE_FAULT.load(Ordering::Acquire) {
         1 => "missed-period",
         2 => "task-stalled",
+        3 => "diagnostic-failure",
         _ => "none",
     }
 }
@@ -69,6 +71,7 @@ pub(crate) fn escalation_cause() -> Option<safety_core::escalation::EscalationRe
     match DEADLINE_FAULT.load(Ordering::Acquire) {
         1 => Some(EscalationReason::DeadlineMiss),
         2 => Some(EscalationReason::TaskStalled),
+        3 => Some(EscalationReason::DiagnosticFailure),
         _ => None,
     }
 }
@@ -120,6 +123,7 @@ fn deadline_name(fault: Option<DeadlineFault>) -> &'static str {
         None => "none",
         Some(DeadlineFault::MissedPeriod) => "missed-period",
         Some(DeadlineFault::TaskStalled) => "task-stalled",
+        Some(DeadlineFault::DiagnosticFailure) => "diagnostic-failure",
     }
 }
 

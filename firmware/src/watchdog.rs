@@ -30,8 +30,13 @@ pub(crate) fn set_previous_reset(reason: Option<EscalationReason>) {
 }
 
 #[cfg(feature = "thermal-demo")]
+pub(crate) fn previous_reset_cause() -> Option<EscalationReason> {
+    EscalationReason::from_code(PREVIOUS_RESET_REASON.load(Ordering::Acquire))
+}
+
+#[cfg(feature = "thermal-demo")]
 pub(crate) fn previous_reset_reason() -> &'static str {
-    match EscalationReason::from_code(PREVIOUS_RESET_REASON.load(Ordering::Acquire)) {
+    match previous_reset_cause() {
         Some(reason) => reason.name(),
         None => "none",
     }
