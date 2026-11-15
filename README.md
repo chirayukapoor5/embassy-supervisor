@@ -21,9 +21,9 @@ for [embassy](https://embassy.dev) firmware. No kernel, no per-task stacks, no a
 
 **Embedded Rust | Arm Cortex-M33 | Embassy async | Dual-core RP2350 | Watchdog | Fault injection | QEMU**
 
-This fork extends the existing [embassy-supervisor](https://github.com/cedrivard/embassy-supervisor) firmware with an **original, hardware-independent Rust \`no_std\` safety-policy library** and opt-in integration with its RP2350 benchmark task. The work addresses a concrete embedded reliability problem: **detect abnormal temperature samples, missed execution deadlines, task stalls and failed diagnostic checks; restrict nonessential computation; and require evidence of recovery before restoring work.**
+This fork extends the existing [embassy-supervisor](https://github.com/cedrivard/embassy-supervisor) firmware with an **original, hardware-independent Rust `no_std` safety-policy library** and opt-in integration with its RP2350 benchmark task. The work addresses a concrete embedded reliability problem: **detect abnormal temperature samples, missed execution deadlines, task stalls and failed diagnostic checks; restrict nonessential computation; and require evidence of recovery before restoring work.**
 
-> **Contribution boundary:** The core \`embassy-supervisor\` framework, original RP2350 firmware, USB networking, OTA, bootloader and base watchdog are upstream work by **Cedric Rivard and contributors**. The fork-specific additions described below are the thermal/deadline/escalation policies, workload integration, bounded diagnostic verification, reset records, tests, fault-campaign reporting and QEMU policy smoke test. All upstream license and attribution notices are retained.
+> **Contribution boundary:** The core `embassy-supervisor` framework, original RP2350 firmware, USB networking, OTA, bootloader and base watchdog are upstream work by **Cedric Rivard and contributors**. The fork-specific additions described below are the thermal/deadline/escalation policies, workload integration, bounded diagnostic verification, reset records, tests, fault-campaign reporting and QEMU policy smoke test. All upstream license and attribution notices are retained.
 
 [**Architecture**](docs/architecture/README.md) · [**Safety policy source**](safety-core/src/lib.rs) · [**Requirements & verification**](docs/verification/README.md) · [**Draft pull request**](https://github.com/chirayukapoor5/embassy-supervisor/pull/1) · [**Verified safety CI run**](https://github.com/chirayukapoor5/embassy-supervisor/actions/runs/43253866401)
 
@@ -32,17 +32,17 @@ This fork extends the existing [embassy-supervisor](https://github.com/cedrivard
 | Engineering area | Fork-specific implementation |
 | --- | --- |
 | **Thermal safety state machine** | Four operating modes — ACTIVE, IDLE, THROTTLED and SAFE — with simulated sensor plausibility checks, configurable thresholds, hysteresis, fail-safe startup and guarded recovery. |
-| **Dual-core workload control** | An opt-in \`thermal-demo\` task publishes atomic workload limits to the existing benchmark on RP2350 core 1. SAFE disables application iterations; THROTTLED and IDLE apply reduced computation quotas. |
+| **Dual-core workload control** | An opt-in `thermal-demo` task publishes atomic workload limits to the existing benchmark on RP2350 core 1. SAFE disables application iterations; THROTTLED and IDLE apply reduced computation quotas. |
 | **Execution deadline monitoring** | Tracks 100 ms benchmark periods, records late completions using a 5 ms demonstration jitter margin and detects stalled progress after 250 ms. These are *policy settings*, not proven hardware WCET limits. |
 | **Diagnostic-backed recovery** | Executes a bounded **96-round arithmetic self-check** even while application computation is blocked. Recovery requires **three distinct on-time periods** with successful diagnostic work; timer wakeups alone cannot clear the fault latch. |
 | **Fault escalation and watchdog** | Extends the **existing** watchdog feed path with a persistent-fault escalation policy (5 s grace window, 8 s hardware watchdog configuration). Diagnostic, deadline, task-stall and monitor-staleness faults can trigger a sticky reset-pending decision. |
 | **Reset evidence and safer startup** | Encodes the escalation reason with a version marker and complement check in watchdog scratch register 3; inhibits automatic benchmark restart after a recognized previous escalation. |
 | **Verification and traceability** | Maps 27 requirements to 27 deterministic fault-injection cases; validates report completeness and generates JSON/Markdown evidence in GitHub Actions. |
-| **Arm portability** | Runs representative \`safety-core\` logic on an **emulated Cortex-M33 CPU** using QEMU MPS2-AN505, separately from cross-compiling the RP2350 firmware. |
+| **Arm portability** | Runs representative `safety-core` logic on an **emulated Cortex-M33 CPU** using QEMU MPS2-AN505, separately from cross-compiling the RP2350 firmware. |
 
 ### Architecture at a glance
 
-\`\`\`text
+```text
 Synthetic temperature input ──> Thermal SafetyController ─┐
                                                             ├──> Atomic workload gate
 RP2350 core 1: BENCH task ──> Period + diagnostic counters │         │
@@ -57,9 +57,9 @@ RP2350 core 1: BENCH task ──> Period + diagnostic counters │         │
                         Existing watchdog feeder
                                   │
                     Reset cause + startup inhibition
-\`\`\`
+```
 
-This design integrates with Embassy's existing async task lifecycle and multicore application. The \`safety-core\` policies are dependency-free and testable on a host independently of the board.
+This design integrates with Embassy's existing async task lifecycle and multicore application. The `safety-core` policies are dependency-free and testable on a host independently of the board.
 
 ### Verification evidence
 
@@ -74,13 +74,13 @@ The following results were recorded in [GitHub Actions run #43253866401](https:/
 | Cortex-M33 QEMU runtime smoke | **Passed** | The shared policy executed on an emulated Arm CPU |
 | RP2350 firmware build matrix | **3 variants compiled** | Cross-compilation, **not** physical runtime testing |
 
-The CI run publishes a **\`safety-fault-campaign\`** artifact with raw JSONL evidence, machine-readable results and a reviewer-friendly Markdown report. The requirements manifest is in [\`docs/verification/requirements.json\`](docs/verification/requirements.json).
+The CI run publishes a **`safety-fault-campaign`** artifact with raw JSONL evidence, machine-readable results and a reviewer-friendly Markdown report. The requirements manifest is in [`docs/verification/requirements.json`](docs/verification/requirements.json).
 
 ### Reproduce the verification
 
 From the repository root on **Windows PowerShell**:
 
-\`\`\`powershell
+```powershell
 git switch feature/power-thermal-supervisor
 git pull --ff-only
 
@@ -92,21 +92,21 @@ cargo run -p safety-core --example fault_matrix --target x86_64-pc-windows-msvc 
 python tools/verify_fault_report.py
 
 cargo build --release -p firmware --features thermal-demo
-\`\`\`
+```
 
 QEMU is run automatically in CI; you do **not** need an RP2350 board to run the host campaigns or review the reports. For the full setup, see [the verification guide](docs/verification/README.md).
 
 ### Project description for applications
 
-**Cortex-M33 Power, Thermal & Reliability Supervisor** — Developed an additive \`no_std\` Rust safety layer for an Embassy-based dual-core RP2350 firmware project. Implemented thermal state transitions, cross-core workload throttling, deadline and stall monitoring, bounded diagnostic-based recovery, persistent-fault watchdog escalation, and integrity-checked reset diagnostics. Verified the policies through **42 Rust tests, 27 traced fault-injection scenarios, 6 report-validator tests, Cortex-M33 QEMU execution, and three target firmware builds**.
+**Cortex-M33 Power, Thermal & Reliability Supervisor** — Developed an additive `no_std` Rust safety layer for an Embassy-based dual-core RP2350 firmware project. Implemented thermal state transitions, cross-core workload throttling, deadline and stall monitoring, bounded diagnostic-based recovery, persistent-fault watchdog escalation, and integrity-checked reset diagnostics. Verified the policies through **42 Rust tests, 27 traced fault-injection scenarios, 6 report-validator tests, Cortex-M33 QEMU execution, and three target firmware builds**.
 
 **Resume-ready technical bullets (describe the fork-specific work):**
 
-- Engineered a \`no_std\` Rust safety-policy layer for Cortex-M33 firmware, combining four thermal states, hysteresis and atomic cross-core workload gating to suspend nonessential computation on simulated critical faults.
+- Engineered a `no_std` Rust safety-policy layer for Cortex-M33 firmware, combining four thermal states, hysteresis and atomic cross-core workload gating to suspend nonessential computation on simulated critical faults.
 - Implemented 100 ms deadline monitoring, 250 ms task-stall detection and a 96-round bounded diagnostic probe; required three verified on-time diagnostic periods before clearing a latched fault.
 - Integrated persistent-fault escalation with the existing watchdog feed path, added corruption-checked reset records, and verified behavior with **42 automated Rust tests, 27 requirement-linked fault scenarios and QEMU Cortex-M33 policy execution**.
 
-**Technology:** Rust (\`no_std\`), Embassy, Arm Cortex-M33, RP2350, atomics, watchdog supervision, fault injection, QEMU, Python, GitHub Actions, CI.
+**Technology:** Rust (`no_std`), Embassy, Arm Cortex-M33, RP2350, atomics, watchdog supervision, fault injection, QEMU, Python, GitHub Actions, CI.
 
 **Validation limits:** This is a *software-verified, firmware-cross-compiled demonstration*. Temperatures are synthetic; QEMU executes the portable policy on **AN505, not the RP2350 board**. The real dual-core runtime, physical watchdog reset, scratch retention, thermal behavior, worst-case timing and energy consumption have **not** been validated on silicon. The shared-core diagnostic is not independent safety hardware; no ISO 26262 certification, ASIL claim or Automotive SPICE compliance is implied.
 
