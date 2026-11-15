@@ -94,7 +94,7 @@ python tools/verify_fault_report.py
 cargo build --release -p firmware --features thermal-demo
 ```
 
-QEMU is run automatically in CI; you do **not** need an RP2350 board to run the host campaigns or review the reports. For the full setup, see [the verification guide](docs/verification/README.md).
+QEMU is run automatically in CI; and alsi verify offline using RP2350 board to run the host campaigns or review the reports. For the full setup, see [the verification guide](docs/verification/README.md).
 
 ### Project description for applications
 
