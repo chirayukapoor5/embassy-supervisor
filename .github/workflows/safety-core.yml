@@ -1,0 +1,88 @@
+name: Safety Core CI
+
+on:
+  push:
+    branches: [feature/power-thermal-supervisor]
+    paths:
+      - "safety-core/**"
+      - "safety-cortexm33-smoke/**"
+      - "docs/verification/**"
+      - "tools/**"
+      - "firmware/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/safety-core.yml"
+  pull_request:
+    paths:
+      - "safety-core/**"
+      - "safety-cortexm33-smoke/**"
+      - "docs/verification/**"
+      - "tools/**"
+      - "firmware/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/safety-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  safety-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv8m.main-none-eabihf
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked -p safety-core --target x86_64-unknown-linux-gnu
+      - run: cargo check --locked -p safety-core --target thumbv8m.main-none-eabihf
+      - run: cargo run --locked -p safety-core --example simulate --target x86_64-unknown-linux-gnu
+      - run: cargo run --locked -p safety-core --example deadline_campaign --target x86_64-unknown-linux-gnu
+      - run: cargo run --locked -p safety-core --example escalation_campaign --target x86_64-unknown-linux-gnu
+      - run: cargo run --locked -p safety-core --example recovery_campaign --target x86_64-unknown-linux-gnu
+      - run: cargo build --locked --release -p firmware --features thermal-demo
+      - run: cargo build --locked --release -p firmware --no-default-features --features thermal-demo
+      - run: cargo build --locked --release -p firmware
+
+      - name: Verify report-generator refusal tests
+        run: python3 -m unittest discover -s tools/tests -v
+      - name: Execute deterministic fault campaign
+        run: |
+          mkdir -p reports
+          cargo run --locked -p safety-core --example fault_matrix --target x86_64-unknown-linux-gnu > reports/raw-fault-campaign.jsonl
+      - name: Check requirement coverage and generate structured report
+        run: python3 tools/verify_fault_report.py --sha "$GITHUB_SHA"
+      - name: Upload fault verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-fault-campaign
+          path: reports/
+          if-no-files-found: warn
+
+  arm-emulator:
+    name: Cortex-M33 runtime (QEMU MPS2-AN505)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv8m.main-none-eabihf
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Arm system emulator
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qemu-system-arm
+      - name: Build no_std policy for Cortex-M33
+        run: cargo build --locked --release -p safety-cortexm33-smoke --target thumbv8m.main-none-eabihf
+      - name: Inspect QEMU vector-table mapping
+        run: |
+          readelf -h -l target/thumbv8m.main-none-eabihf/release/safety-cortexm33-smoke
+          printf 'xp /8wx 0x00000000\nxp /8wx 0x00400000\nxp /8wx 0x28000000\ninfo registers\nquit\n' | \
+            timeout 15s qemu-system-arm -M mps2-an505 -S -display none -serial none -monitor stdio -semihosting \
+              -kernel target/thumbv8m.main-none-eabihf/release/safety-cortexm33-smoke
+      - name: Execute policy in Arm Cortex-M33 emulator
+        run: |
+          timeout 20s qemu-system-arm -M mps2-an505 -nographic -semihosting \
+            -kernel target/thumbv8m.main-none-eabihf/release/safety-cortexm33-smoke
+          echo "PASS: policy executed on emulated Cortex-M33"

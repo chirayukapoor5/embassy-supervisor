@@ -236,6 +236,50 @@ async fn serve_connection(
                 build_events_json(&mut body);
                 send(socket, "application/json", &body, keep).await;
             }
+            #[cfg(feature = "thermal-demo")]
+            ("GET", "/api/safety") => {
+                let mut body = String::with_capacity(200);
+                let temp = crate::thermal_demo::simulated_temperature();
+                let _ = write!(
+                    body,
+                    "{{\"source\":\"synthetic\",\"mode\":\"{}\",\"benchmark_budget_percent\":{},\"executed_iterations\":{},\"temperature_c\":",
+                    crate::thermal_demo::mode_name(),
+                    crate::thermal_demo::workload_limit(),
+                    crate::bench::EXECUTED_ITERATIONS.load(Ordering::Relaxed),
+                );
+                match temp {
+                    Some(t) => { let _ = write!(body, "{t}"); }
+                    None => body.push_str("null"),
+                }
+                let _ = write!(
+                    body,
+                    ",\"watchdog_escalation_stage\":\"{}\",\"watchdog_escalation_reason\":\"{}\",\"watchdog_escalation_age_ms\":{},\"previous_safety_reset\":\"{}\"",
+                    crate::watchdog::escalation_stage_name(),
+                    crate::watchdog::escalation_reason_name(),
+                    crate::watchdog::escalation_age_ms(),
+                    crate::watchdog::previous_reset_reason(),
+                );
+                body.push_str(",\"deadline_fault\":\"");
+                body.push_str(crate::thermal_demo::deadline_fault_name());
+                body.push('"');
+                let _ = write!(
+                    body,
+                    ",\"deadline_recovery_remaining\":{},\"monitor_fresh\":{},\"bench_running\":{},\"completed_windows\":{},\"missed_windows\":{},\"verified_windows\":{},\"failed_probes\":{},\"completion_age_ms\":",
+                    crate::thermal_demo::deadline_recovery_remaining(),
+                    crate::thermal_demo::monitor_is_fresh(),
+                    crate::bench::BENCH_RUNNING.load(Ordering::Acquire),
+                    crate::bench::COMPLETED_WINDOWS.load(Ordering::Acquire),
+                    crate::bench::MISSED_WINDOWS.load(Ordering::Acquire),
+                    crate::bench::VERIFIED_WINDOWS.load(Ordering::Acquire),
+                    crate::bench::FAILED_PROBES.load(Ordering::Acquire),
+                );
+                match crate::thermal_demo::completion_age_ms() {
+                    Some(ms) => { let _ = write!(body, "{ms}"); }
+                    None => body.push_str("null"),
+                }
+                body.push('}');
+                send(socket, "application/json", &body, keep).await;
+            }
             ("GET", "/api/bench") => {
                 let mut body = String::with_capacity(48);
                 match crate::BENCH_EXIT.take() {

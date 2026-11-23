@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "scope": "synthetic safety-core policy with verified diagnostic recovery and reset evidence; hardware not exercised",
+  "requirements": [
+    {
+      "id": "SR-001",
+      "description": "Fail-safe startup without samples",
+      "implementation": "safety-core/src/lib.rs",
+      "scenario": "FI-001"
+    },
+    {
+      "id": "SR-002",
+      "description": "Throttle elevated synthetic temperature",
+      "implementation": "safety-core/src/lib.rs",
+      "scenario": "FI-002"
+    },
+    {
+      "id": "SR-003",
+      "description": "Critical temperature enters SAFE",
+      "implementation": "safety-core/src/lib.rs",
+      "scenario": "FI-003"
+    },
+    {
+      "id": "SR-004",
+      "description": "Missing sensor enters SAFE",
+      "implementation": "safety-core/src/lib.rs",
+      "scenario": "FI-004"
+    },
+    {
+      "id": "SR-005",
+      "description": "Implausible sensor reading enters SAFE",
+      "implementation": "safety-core/src/lib.rs",
+      "scenario": "FI-005"
+    },
+    {
+      "id": "SR-006",
+      "description": "Require three cool samples for thermal recovery",
+      "implementation": "safety-core/src/lib.rs",
+      "scenario": "FI-006"
+    },
+    {
+      "id": "SR-007",
+      "description": "Bound benchmark work in THROTTLED",
+      "implementation": "safety-core/src/lib.rs",
+      "scenario": "FI-007"
+    },
+    {
+      "id": "SR-008",
+      "description": "Detect deadline miss",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-008"
+    },
+    {
+      "id": "SR-009",
+      "description": "Detect stalled running workload",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-009"
+    },
+    {
+      "id": "SR-010",
+      "description": "Require distinct on-time completion evidence for deadline recovery",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-010"
+    },
+    {
+      "id": "SR-011",
+      "description": "Fail closed when safety monitor timestamp is missing",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-011"
+    },
+    {
+      "id": "SR-012",
+      "description": "Give transient fault a grace window",
+      "implementation": "safety-core/src/escalation.rs",
+      "scenario": "FI-012"
+    },
+    {
+      "id": "SR-013",
+      "description": "Escalate persistent faults to reset pending",
+      "implementation": "safety-core/src/escalation.rs",
+      "scenario": "FI-013"
+    },
+    {
+      "id": "SR-014",
+      "description": "Keep reset pending latched after fault clears",
+      "implementation": "safety-core/src/escalation.rs",
+      "scenario": "FI-014"
+    },
+    {
+      "id": "SR-015",
+      "description": "Encode/decode reset reason consistently",
+      "implementation": "safety-core/src/escalation.rs",
+      "scenario": "FI-015"
+    },
+    {
+      "id": "SR-016",
+      "description": "Avoid reset solely for synthetic thermal SAFE state",
+      "implementation": "safety-core/src/escalation.rs",
+      "scenario": "FI-016"
+    },
+    {
+      "id": "SR-017",
+      "description": "Deadline fault overrides workload allowance",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-017"
+    },
+    {
+      "id": "SR-018",
+      "description": "Handle monotonic timestamp rollover in escalation",
+      "implementation": "safety-core/src/escalation.rs",
+      "scenario": "FI-018"
+    },
+    {
+      "id": "SR-019",
+      "description": "Worker bounded diagnostic matches golden vector",
+      "implementation": "safety-core/src/diagnostic.rs",
+      "scenario": "FI-019"
+    },
+    {
+      "id": "SR-020",
+      "description": "Corrupted diagnostic input is detected",
+      "implementation": "safety-core/src/diagnostic.rs",
+      "scenario": "FI-020"
+    },
+    {
+      "id": "SR-021",
+      "description": "A failed probe creates a latched diagnostic failure",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-021"
+    },
+    {
+      "id": "SR-022",
+      "description": "Timer-only completions cannot clear a deadline latch",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-022"
+    },
+    {
+      "id": "SR-023",
+      "description": "Three verified diagnostic periods can recover during SAFE",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-023"
+    },
+    {
+      "id": "SR-024",
+      "description": "Reset record encoding detects accidental corruption",
+      "implementation": "safety-core/src/reset_record.rs",
+      "scenario": "FI-024"
+    },
+    {
+      "id": "SR-025",
+      "description": "A prior safety reset inhibits benchmark auto-start",
+      "implementation": "safety-core/src/reset_record.rs",
+      "scenario": "FI-025"
+    },
+    {
+      "id": "SR-026",
+      "description": "Counter rollover is valid progress but counter rollback is not",
+      "implementation": "safety-core/src/deadline.rs",
+      "scenario": "FI-026"
+    },
+    {
+      "id": "SR-027",
+      "description": "Persistent diagnostic failures escalate to watchdog reset-pending",
+      "implementation": "safety-core/src/escalation.rs",
+      "scenario": "FI-027"
+    }
+  ]
+}

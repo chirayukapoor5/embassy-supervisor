@@ -1,0 +1,16 @@
+[package]
+name = "safety-cortexm33-smoke"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Bare-metal QEMU Cortex-M33 runtime smoke of shared no_std safety policy"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+cortex-m-rt = "0.7"
+safety-core = { path = "../safety-core" }
+
+[[bin]]
+name = "safety-cortexm33-smoke"
+test = false
+bench = false

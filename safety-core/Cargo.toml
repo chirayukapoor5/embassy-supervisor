@@ -1,0 +1,11 @@
+[package]
+name = "safety-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/chirayukapoor5/embassy-supervisor"
+description = "Hardware-independent thermal safety policy for Arm Cortex-M33 firmware"
+publish = false
+
+[dependencies]
