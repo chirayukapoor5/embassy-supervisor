@@ -1,3 +1,9 @@
+> **Reviewer / NVIDIA firmware entry point (this fork):** [**Cortex-M33 Power & Thermal Supervisor — case study**](NVIDIA-FIRMWARE-CASE-STUDY.md) · [**My changes: draft PR #1**](https://github.com/chirayukapoor5/embassy-supervisor/pull/1/files) · [**Policy source**](safety-core/src/lib.rs) · [**Firmware integration**](firmware/src/thermal_demo.rs) · [**Verified CI evidence**](https://github.com/chirayukapoor5/embassy-supervisor/actions/runs/43253866401).
+>
+> **Evidence boundary:** 42 host Rust tests, 27 deterministic fault scenarios and Cortex-M33 QEMU policy smoke succeeded in the linked **12 Nov 2026 historical CI run**; three firmware variants compiled. **No physical RP2350 board validation has been performed or evidenced.** The underlying Embassy framework and original board application are [upstream work](https://github.com/cedrivard/embassy-supervisor); the case study isolates this fork's original contributions.
+
+---
+
 <div align="center">
 
 # embassy-supervisor
@@ -25,7 +31,7 @@ This fork extends the existing [embassy-supervisor](https://github.com/cedrivard
 
 > **Contribution boundary:** The core `embassy-supervisor` framework, original RP2350 firmware, USB networking, OTA, bootloader and base watchdog are upstream work by **Cedric Rivard and contributors**. The fork-specific additions described below are the thermal/deadline/escalation policies, workload integration, bounded diagnostic verification, reset records, tests, fault-campaign reporting and QEMU policy smoke test. All upstream license and attribution notices are retained.
 
-[**Architecture**](docs/architecture/README.md) · [**Safety policy source**](safety-core/src/lib.rs) · [**Requirements & verification**](docs/verification/README.md) · [**Draft pull request**](https://github.com/chirayukapoor5/embassy-supervisor/pull/1) · [**Verified safety CI run**](https://github.com/chirayukapoor5/embassy-supervisor/actions/runs/43253866401)
+[**NVIDIA firmware case study**](NVIDIA-FIRMWARE-CASE-STUDY.md) · [**Architecture**](docs/architecture/README.md) · [**Safety policy source**](safety-core/src/lib.rs) · [**Requirements & verification**](docs/verification/README.md) · [**Draft pull request**](https://github.com/chirayukapoor5/embassy-supervisor/pull/1) · [**Verified safety CI run**](https://github.com/chirayukapoor5/embassy-supervisor/actions/runs/43253866401)
 
 ### What I implemented
 
