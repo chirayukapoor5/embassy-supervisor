@@ -3,6 +3,8 @@
 **Status: software-verified prototype; NOT physically validated on RP2350 silicon.**  
 **My contribution:** an additive Rust `no_std` safety-policy crate, opt-in RP2350 BENCH integration, bounded diagnostics, watchdog-escalation policy, reset-record encoding, fault campaigns, and QEMU smoke coverage. **Not my work:** the upstream [Embassy Supervisor](https://github.com/cedrivard/embassy-supervisor) task-supervision framework, original RP2350 firmware, USB/OTA/bootloader, or underlying watchdog driver. Existing authorship and licenses are preserved.
 
+**Design review (maintainer brief):** [ENGINEERING-DESIGN-REVIEW.md](ENGINEERING-DESIGN-REVIEW.md) — architecture, decisions, concurrency, failure handling, test commands and validation limits.
+
 **Start here:** [Review the complete change in draft PR #1](https://github.com/chirayukapoor5/embassy-supervisor/pull/1) · [Architecture](docs/architecture/README.md) · [Verification/traceability](docs/verification/README.md) · [Historical successful CI run (12 Nov 2026)](https://github.com/chirayukapoor5/embassy-supervisor/actions/runs/43253866401).
 
 ## Engineering problem and approach
